@@ -151,7 +151,16 @@ async function insertInterstitional() {
 }
 
 
-async function maybeTimestampBlock(block: BlockEntity) {
+async function maybeTimestampBlock(eventBlock?: Partial<BlockEntity> | null) {
+  if (!eventBlock?.uuid) {
+    return;
+  }
+
+  const block = await logseq.Editor.getBlock(eventBlock.uuid, { includeChildren: false });
+  if (!block?.uuid || !block.parent?.id || !block.page?.id) {
+    return;
+  }
+
   const settings = logseq.settings as unknown as PluginSettings;
   const parent = await logseq.Editor.getBlock(block.parent.id, { includeChildren: false });
   const page = await logseq.Editor.getPage(block.page.id);
@@ -206,7 +215,13 @@ const main = async () => {
   logseq.DB.onChanged((e) => {
     if (e.txMeta?.outlinerOp == "save-block" || e.txMeta?.outlinerOp == "saveBlock") {
       const block = e.blocks[0];
-      maybeTimestampBlock(block)
+      if (!block) {
+        return;
+      }
+
+      void maybeTimestampBlock(block).catch((error) => {
+        console.error("Failed to process interstitial timestamp", error);
+      });
       // if (logseq.settings?.enableAutoParse ) {
     }
   });
